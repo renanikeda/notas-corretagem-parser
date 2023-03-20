@@ -1,5 +1,5 @@
 from PyPDF2 import PdfReader
-from utils import regex_date, parse_number
+from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name
 import pyparsing as pp
 import pandas as pd
 import numpy as np
@@ -21,8 +21,8 @@ class ParseCorretagem():
         self.start_line = start_line
         self.start_block = start_block
         self.end_block = end_block
-        self.default_row_pattern = pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('1-BOVESPA')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(pp.alphas)) + pp.Word(pp.alphas)('nome') + pp.Suppress(pp.SkipTo(pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number)
-        self.columns = ['Data Trade', 'Tipo', 'Nome', 'Quantidade', 'Preço', 'Total']
+        self.default_row_pattern = pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('1-BOVESPA')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(start_asset_name)) + pp.SkipTo(pp.Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + pp.Suppress(pp.SkipTo(pp.Word(pp.printables) + pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.printables).set_parse_action(filter_obs)('Obs') + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number)
+        self.columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
         self.parsed_pdf = None
         self.rows_pdf = None
             
@@ -38,6 +38,7 @@ class ParseCorretagem():
                 text_page = re.sub(self.start_line, '\n' + data_trade + ' ' + self.start_line, text_page)
                 rows_pdf += text_page
         self.rows_pdf = rows_pdf
+        #print(rows_pdf)
         return rows_pdf
 
     def parse(self, pattern = None):
@@ -46,6 +47,7 @@ class ParseCorretagem():
         block = self.rows_pdf
         row_pattern = self.default_row_pattern if pattern is None else pattern
         self.parsed_pdf = row_pattern.searchString(block)
+        #print(self.parsed_pdf)
         return self.parsed_pdf
     
     def get_df(self):
@@ -73,8 +75,7 @@ class ParseCorretagem():
             mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': notional, 'Preço Médio': mean_price, 'Posição Final': position } 
         return mean_df
 
-
-parsePDF = ParseCorretagem('D:/User/Documentos/IR/2022/Rico/Nota de Corretagem')
+parsePDF = ParseCorretagem('D:/User/Documentos/IR/2022/RICO/Nota de Corretagem')
 pdParsedPdf = parsePDF.get_df()
 pdMeanPdf = parsePDF.mean_price()
 writer = pd.ExcelWriter("Notas_Parseadas.xlsx", engine = 'openpyxl', mode = 'a', if_sheet_exists = 'replace' )
