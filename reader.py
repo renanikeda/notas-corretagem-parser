@@ -75,10 +75,20 @@ class ParseCorretagem():
             mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': notional, 'Preço Médio': mean_price, 'Posição Final': position } 
         return mean_df
 
-parsePDF = ParseCorretagem('D:/User/Documentos/IR/2022/RICO/Nota de Corretagem')
+parsePDF = ParseCorretagem('D:/User/Documentos/IR/2022/RICO/Notas de Corretagem')
 pdParsedPdf = parsePDF.get_df()
 pdMeanPdf = parsePDF.mean_price()
-writer = pd.ExcelWriter("Notas_Parseadas.xlsx", engine = 'openpyxl', mode = 'a', if_sheet_exists = 'replace' )
+
+file_to_save = "Notas_Parseadas_Rico.xlsx"
+
+if file_to_save in os.listdir():
+    mode = 'a'
+    if_sheet_exists = 'replace' 
+else:
+    mode = 'w'
+    if_sheet_exists = None
+
+writer = pd.ExcelWriter(file_to_save, engine = 'openpyxl', mode = mode, if_sheet_exists = if_sheet_exists)
 
 pdParsedPdf.to_excel(writer, sheet_name="Nota", index=False)
 pdMeanPdf.to_excel(writer, sheet_name="Preco Medio", index=False)
