@@ -75,18 +75,23 @@ class ParseCorretagem():
             mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': notional, 'Preço Médio': mean_price, 'Posição Final': position } 
         return mean_df
 
-parsePDF = ParseCorretagem('D:/User/Documentos/IR/2022/RICO/Notas de Corretagem')
+    def day_trade_gain_and_losses(self):
+        if not self.parsed_pdf:
+            self.parse()
+        assets = pdParsedPdf['Nome'].unique()
+        for asset in assets:
+            subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset) & (pdParsedPdf['Tipo'] == 'V')]
+        return 
+
+parsePDF = ParseCorretagem('D:/User/Documentos/IR/2023/RICO/Notas de Corretagem')
 pdParsedPdf = parsePDF.get_df()
 pdMeanPdf = parsePDF.mean_price()
 
 file_to_save = "Notas_Parseadas_Rico.xlsx"
+file_already_exists = file_to_save in os.listdir()
 
-if file_to_save in os.listdir():
-    mode = 'a'
-    if_sheet_exists = 'replace' 
-else:
-    mode = 'w'
-    if_sheet_exists = None
+mode = 'a' if file_already_exists else 'w'
+if_sheet_exists = 'replace' if file_already_exists else None 
 
 writer = pd.ExcelWriter(file_to_save, engine = 'openpyxl', mode = mode, if_sheet_exists = if_sheet_exists)
 
