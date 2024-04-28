@@ -1,5 +1,6 @@
 from PyPDF2 import PdfReader
 from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name
+from datetime import datetime
 import pyparsing as pp
 import pandas as pd
 import numpy as np
@@ -83,11 +84,12 @@ class ParseCorretagem():
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset) & (pdParsedPdf['Tipo'] == 'V')]
         return 
 
-parsePDF = ParseCorretagem('D:/User/Documentos/IR/2023/RICO/Notas de Corretagem')
+broker = "XP"
+parsePDF = ParseCorretagem(f'D:/User/Documentos/IR/2023/{broker}/Notas de Corretagem')
 pdParsedPdf = parsePDF.get_df()
 pdMeanPdf = parsePDF.mean_price()
 
-file_to_save = "Notas_Parseadas_Rico.xlsx"
+file_to_save = f"Notas_Parseadas_{datetime.now().year}_{broker}.xlsx"
 file_already_exists = file_to_save in os.listdir()
 
 mode = 'a' if file_already_exists else 'w'
