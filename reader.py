@@ -12,12 +12,14 @@ pd.options.mode.chained_assignment = None
 class ParseCorretagem():
     def __init__(self, path = "12_2022.pdf", start_line = '1-BOVESPA', start_block = r'Negócios realizados.*Ajuste D/C', end_block = r'NOTA DE NEGOCIAÇÃO.*'):
         self.path = path
+        files_path = []
         if (path.split('.')[-1] == 'pdf'):
-            files_path = [path]
+            files_path.append(path)
         else:
-            files = filter(lambda file: '.pdf' in file, os.listdir(path))
-            files_path = map(lambda file: path + '/' + file, files)
-
+            for file_year in os.listdir(self.path):
+                files = filter(lambda file: '.pdf' in file, os.listdir(f'{self.path}/{file_year}'))
+                files_path.append(list(map(lambda file: path + '/' + file, files)))
+        print(files_path)
         self.readers = [PdfReader(file) for file in files_path]
         self.start_line = start_line
         self.start_block = start_block
@@ -85,7 +87,7 @@ class ParseCorretagem():
         return 
 
 broker = "XP"
-parsePDF = ParseCorretagem(f'D:/User/Documentos/IR/2023/{broker}/Notas de Corretagem')
+parsePDF = ParseCorretagem(f'D:/User/Documentos/IR/{broker}/')
 pdParsedPdf = parsePDF.get_df()
 pdMeanPdf = parsePDF.mean_price()
 
