@@ -71,10 +71,11 @@ class ParseCorretagem():
         for asset in assets:
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset) & (pdParsedPdf['Tipo'] == 'C')]
             mean_price = subDf.groupby('Nome').apply(lambda df: round(np.average(df['Preço'], weights=df['Quantidade']), 2)).values[0]
-            notional = (subDf['Quantidade'].sum(numeric_only = True))
 
             subDf = pdParsedPdf[pdParsedPdf['Nome'] == asset]
+            notional = (subDf['Quantidade'].sum(numeric_only = True))
             position = round((subDf['Preço']*subDf['Quantidade']).sum(), 2)
+            if notional == 0: position = 0
 
             mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': notional, 'Preço Médio': mean_price, 'Posição Final': position } 
         return mean_df
@@ -87,8 +88,8 @@ class ParseCorretagem():
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset) & (pdParsedPdf['Tipo'] == 'V')]
         return 
 
-broker = "XP"
-parsePDF = ParseCorretagem(f'D:/User/Documentos/IR/{broker}/')
+broker = "RICO"
+parsePDF = ParseCorretagem(f'D:/User/Documentos/IR/{broker}')
 pdParsedPdf = parsePDF.get_df()
 pdMeanPdf = parsePDF.mean_price()
 
