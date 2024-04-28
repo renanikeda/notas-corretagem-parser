@@ -17,9 +17,10 @@ class ParseCorretagem():
             files_path.append(path)
         else:
             for file_year in os.listdir(self.path):
-                files = filter(lambda file: '.pdf' in file, os.listdir(f'{self.path}/{file_year}'))
-                files_path.append(list(map(lambda file: path + '/' + file, files)))
-        print(files_path)
+                # print(f'{self.path}/{file_year}')
+                files = filter(lambda file: '.pdf' in file, os.listdir(f'{self.path}/{file_year}/Notas de Corretagem'))
+                files_path = [*files_path, *list(map(lambda file: f'{self.path}/{file_year}/Notas de Corretagem/{file}', files))]
+        # print(files_path)
         self.readers = [PdfReader(file) for file in files_path]
         self.start_line = start_line
         self.start_block = start_block
