@@ -17,7 +17,7 @@ class ParseCorretagem():
             files_path.append(path)
         else:
             for file_year in os.listdir(self.path):
-                # print(f'{self.path}/{file_year}')
+                print(f'Seaching path {self.path}/{file_year}/Notas de Corretagem/*.pdf')
                 files = filter(lambda file: '.pdf' in file, os.listdir(f'{self.path}/{file_year}/Notas de Corretagem'))
                 files_path = [*files_path, *list(map(lambda file: f'{self.path}/{file_year}/Notas de Corretagem/{file}', files))]
         # print(files_path)
