@@ -29,6 +29,7 @@ class ParseCorretagem():
         self.default_row_pattern = pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('1-BOVESPA')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(start_asset_name)) + pp.SkipTo(pp.Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + pp.Suppress(pp.SkipTo(pp.Word(pp.printables) + pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.printables).set_parse_action(filter_obs)('Obs') + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number)
         self.columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
         self.parsed_pdf = None
+        self.pd_parsed_pdf = pd.DataFrame()
         self.rows_pdf = None
             
     def generate_rows(self):
@@ -58,12 +59,16 @@ class ParseCorretagem():
     def get_df(self):
         if not self.parsed_pdf:
             self.parse()
-        pdParsedPdf = pd.DataFrame(self.parsed_pdf, columns = self.columns)
-        pdParsedPdf['Quantidade'] = pdParsedPdf['Quantidade'].astype(float)
-        pdParsedPdf['Preço'] = pdParsedPdf['Preço'].astype(float)
-        pdParsedPdf['Total'] = pdParsedPdf['Total'].astype(float)
-        pdParsedPdf.loc[pdParsedPdf['Tipo'] == 'V', 'Quantidade'] = pdParsedPdf.loc[pdParsedPdf['Tipo'] == 'V', 'Quantidade']*(-1)
-        return pdParsedPdf
+        if self.pd_parsed_pdf.empty:
+            pdParsedPdf = pd.DataFrame(self.parsed_pdf, columns = self.columns)
+            pdParsedPdf['Quantidade'] = pdParsedPdf['Quantidade'].astype(float)
+            pdParsedPdf['Preço'] = pdParsedPdf['Preço'].astype(float)
+            pdParsedPdf['Total'] = pdParsedPdf['Total'].astype(float)
+            pdParsedPdf.loc[pdParsedPdf['Tipo'] == 'V', 'Quantidade'] = pdParsedPdf.loc[pdParsedPdf['Tipo'] == 'V', 'Quantidade']*(-1)
+
+            pdParsedPdf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
+            self.pd_parsed_pdf = pdParsedPdf
+        return self.pd_parsed_pdf
     
     def mean_price(self):
         pdParsedPdf = self.get_df()
@@ -81,17 +86,17 @@ class ParseCorretagem():
             mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': notional, 'Preço Médio': mean_price, 'Posição Final': position } 
         return mean_df
 
-    def day_trade_gain_and_losses(self):
-        if not self.parsed_pdf:
-            self.parse()
+    def trade_gain_and_losses(self):
+        pdParsedPdf = self.get_df()
         assets = pdParsedPdf['Nome'].unique()
         for asset in assets:
-            subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset) & (pdParsedPdf['Tipo'] == 'V')]
+            subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset)]
         return 
 
-parsePDF = ParseCorretagem(f'D:/User/Documentos/IR/')
+parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
 pdParsedPdf = parsePDF.get_df()
 pdMeanPdf = parsePDF.mean_price()
+pdTradesPdf = parsePDF.trade_gain_and_losses()
 
 file_to_save = f"Notas_Parseadas_{datetime.now().year}.xlsx"
 file_already_exists = file_to_save in os.listdir()
@@ -103,5 +108,6 @@ writer = pd.ExcelWriter(file_to_save, engine = 'openpyxl', mode = mode, if_sheet
 
 pdParsedPdf.to_excel(writer, sheet_name="Nota", index=False)
 pdMeanPdf.to_excel(writer, sheet_name="Preco Medio", index=False)
+# pdTradesPdf.to_excel(writer, sheet_name="Ganhos e Perdas", index=False)
 writer.close()
 print('Saved!')
