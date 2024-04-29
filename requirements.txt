@@ -4,3 +4,4 @@ pyparsing==3.0.9
 numpy==1.23.4
 soupsieve==2.3.2.post1
 regex==2022.10.31
+openpyxl==3.0.10
