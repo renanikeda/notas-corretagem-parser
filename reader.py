@@ -16,10 +16,11 @@ class ParseCorretagem():
         if (path.split('.')[-1] == 'pdf'):
             files_path.append(path)
         else:
-            for file_year in os.listdir(self.path):
-                print(f'Seaching path {self.path}/{file_year}/Notas de Corretagem/*.pdf')
-                files = filter(lambda file: '.pdf' in file, os.listdir(f'{self.path}/{file_year}/Notas de Corretagem'))
-                files_path = [*files_path, *list(map(lambda file: f'{self.path}/{file_year}/Notas de Corretagem/{file}', files))]
+            for broker in os.listdir(self.path):
+                for file_year in os.listdir(f'{self.path}/{broker}'):
+                    print(f'Seaching path {self.path}/{broker}/{file_year}/Notas de Corretagem/*.pdf')
+                    files = filter(lambda file: '.pdf' in file, os.listdir(f'{self.path}/{broker}/{file_year}/Notas de Corretagem'))
+                    files_path = [*files_path, *list(map(lambda file: f'{self.path}/{broker}/{file_year}/Notas de Corretagem/{file}', files))]
         # print(files_path)
         self.readers = [PdfReader(file) for file in files_path]
         self.start_line = start_line
@@ -88,12 +89,11 @@ class ParseCorretagem():
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset) & (pdParsedPdf['Tipo'] == 'V')]
         return 
 
-broker = "RICO"
-parsePDF = ParseCorretagem(f'D:/User/Documentos/IR/{broker}')
+parsePDF = ParseCorretagem(f'D:/User/Documentos/IR/')
 pdParsedPdf = parsePDF.get_df()
 pdMeanPdf = parsePDF.mean_price()
 
-file_to_save = f"Notas_Parseadas_{datetime.now().year}_{broker}.xlsx"
+file_to_save = f"Notas_Parseadas_{datetime.now().year}.xlsx"
 file_already_exists = file_to_save in os.listdir()
 
 mode = 'a' if file_already_exists else 'w'
