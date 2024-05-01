@@ -8,6 +8,8 @@ import os
 import re
 
 pd.options.mode.chained_assignment = None
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class ParseCorretagem():
     def __init__(self, path = "12_2022.pdf", start_line = '1-BOVESPA', start_block = r'Negócios realizados.*Ajuste D/C', end_block = r'NOTA DE NEGOCIAÇÃO.*'):
@@ -89,9 +91,22 @@ class ParseCorretagem():
     def trade_gain_and_losses(self):
         pdParsedPdf = self.get_df()
         assets = pdParsedPdf['Nome'].unique()
+        columns_gain_loss = ['Nome', 'Data Trade', 'Quantidade', 'Preço Médio', 'Preço Venda', 'Lucros ou Prejuizos']
+        gainLossDf = pd.DataFrame(columns = columns_gain_loss)
         for asset in assets:
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset)]
-        return 
+            sum_price = 0
+            count = 0
+            for (_, rowSubDf) in subDf.iterrows():
+                if rowSubDf['Tipo'] == 'C':
+                    sum_price += rowSubDf['Quantidade'] * rowSubDf['Preço']
+                    count += rowSubDf['Quantidade']
+                else:
+                    current_mean_price = sum_price / count if count > 0 else 0
+                    selling_price = rowSubDf['Preço']
+                    gain_loss = (selling_price - current_mean_price) * abs(rowSubDf['Quantidade'])
+                    gainLossDf =    gainLossDf.append({'Nome': rowSubDf['Nome'], 'Data Trade': rowSubDf['Data Trade'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, ignore_index = True)
+        return gainLossDf
 
 parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
 pdParsedPdf = parsePDF.get_df()
@@ -108,6 +123,6 @@ writer = pd.ExcelWriter(file_to_save, engine = 'openpyxl', mode = mode, if_sheet
 
 pdParsedPdf.to_excel(writer, sheet_name="Nota", index=False)
 pdMeanPdf.to_excel(writer, sheet_name="Preco Medio", index=False)
-# pdTradesPdf.to_excel(writer, sheet_name="Ganhos e Perdas", index=False)
+pdTradesPdf.to_excel(writer, sheet_name="Ganhos e Perdas", index=False)
 writer.close()
 print('Saved!')
