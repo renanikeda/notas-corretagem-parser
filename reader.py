@@ -91,7 +91,7 @@ class ParseCorretagem():
     def trade_gain_and_losses(self):
         pdParsedPdf = self.get_df()
         assets = pdParsedPdf['Nome'].unique()
-        columns_gain_loss = ['Data Trade', 'Nome' 'Quantidade', 'Operação', 'Preço Médio', 'Preço Venda', 'Lucros ou Prejuizos']
+        columns_gain_loss = ['Data Trade', 'Nome', 'Quantidade', 'Operação', 'Preço Médio', 'Preço Venda', 'Lucros ou Prejuizos']
         gainLossDf = pd.DataFrame(columns = columns_gain_loss)
         for asset in assets:
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset)]
