@@ -1,5 +1,5 @@
 from PyPDF2 import PdfReader
-from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name
+from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name, de_para_ticker
 from datetime import datetime
 import pyparsing as pp
 import pandas as pd
@@ -67,7 +67,7 @@ class ParseCorretagem():
             pdParsedPdf['Preço'] = pdParsedPdf['Preço'].astype(float)
             pdParsedPdf['Total'] = pdParsedPdf['Total'].astype(float)
             pdParsedPdf.loc[pdParsedPdf['Tipo'] == 'V', 'Quantidade'] = pdParsedPdf.loc[pdParsedPdf['Tipo'] == 'V', 'Quantidade']*(-1)
-
+            pdParsedPdf['Nome'] = pdParsedPdf['Nome'].apply(lambda nome: de_para_ticker.get(nome.strip(), nome.strip()))
             pdParsedPdf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
             self.pd_parsed_pdf = pdParsedPdf
         return self.pd_parsed_pdf

@@ -26,3 +26,25 @@ def parse_asset_name(token):
 start_asset_name = r'FRACIONADO|VISTA'
 end_asset_name = r'\s(CI|PNB|UNT|PB|ON|PNA|PN)\s'
 
+b3_ticker = r'[a-zA-Z]{4}\d{1,2}'
+de_para_ticker = {
+    'BRADESPAR': 'BRAP4',
+    'TAESA': 'TAEE11',
+    'BRASKEM': 'BRKM5',
+    'COPEL': 'CPLE6',
+    'ITAUSA': 'ITSA4',
+    'ITAUUNIBANCO': 'ITUB4',
+    'USIMINAS': 'USIM5',
+    'BRASIL': 'BBAS3',
+    'TRAN PAULIST': 'TRPL4',
+    'PETROBRAS': 'PETR4',
+    'SANEPAR': 'SAPR4',
+    'B3': 'B3SA3',
+    'BR PARTNERS': 'BRBI11',
+    'IRANI': 'RANI3',
+    'ISHARE SP500': 'IVVB11',
+    'UNIPAR': 'UNIP6',
+    'WIZ CO': 'WIZC3',
+    'CSNMINERACAO': 'CMIN3',
+    'BBSEGURIDADE': 'BBSE3'
+}
