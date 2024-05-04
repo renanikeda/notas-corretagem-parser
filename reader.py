@@ -18,7 +18,7 @@ class ParseCorretagem():
         if (path.split('.')[-1] == 'pdf'):
             files_path.append(path)
         else:
-            for broker in os.listdir(self.path):
+            for broker in filter(lambda dir: '.' not in dir, os.listdir(self.path)):
                 for file_year in os.listdir(f'{self.path}/{broker}'):
                     print(f'Seaching path {self.path}/{broker}/{file_year}/Notas de Corretagem/*.pdf')
                     files = filter(lambda file: '.pdf' in file, os.listdir(f'{self.path}/{broker}/{file_year}/Notas de Corretagem'))
@@ -91,7 +91,7 @@ class ParseCorretagem():
     def trade_gain_and_losses(self):
         pdParsedPdf = self.get_df()
         assets = pdParsedPdf['Nome'].unique()
-        columns_gain_loss = ['Nome', 'Data Trade', 'Quantidade', 'Preço Médio', 'Preço Venda', 'Lucros ou Prejuizos']
+        columns_gain_loss = ['Data Trade', 'Nome' 'Quantidade', 'Operação', 'Preço Médio', 'Preço Venda', 'Lucros ou Prejuizos']
         gainLossDf = pd.DataFrame(columns = columns_gain_loss)
         for asset in assets:
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset)]
@@ -105,7 +105,8 @@ class ParseCorretagem():
                     current_mean_price = sum_price / count if count > 0 else 0
                     selling_price = rowSubDf['Preço']
                     gain_loss = (selling_price - current_mean_price) * abs(rowSubDf['Quantidade'])
-                    gainLossDf =    gainLossDf.append({'Nome': rowSubDf['Nome'], 'Data Trade': rowSubDf['Data Trade'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, ignore_index = True)
+                    gainLossDf = gainLossDf.append({'Data Trade': rowSubDf['Data Trade'], 'Nome': rowSubDf['Nome'], 'Operação': rowSubDf['Obs'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, ignore_index = True)
+                    gainLossDf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
         return gainLossDf
 
 parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
