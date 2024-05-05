@@ -1,9 +1,11 @@
 from PyPDF2 import PdfReader
-from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name, de_para_ticker
+from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search
 from datetime import datetime
 import pyparsing as pp
 import pandas as pd
 import numpy as np
+import requests
+import base64
 import os
 import re
 
@@ -46,7 +48,6 @@ class ParseCorretagem():
                 text_page = re.sub(self.start_line, '\n' + data_trade + ' ' + self.start_line, text_page)
                 rows_pdf += text_page
         self.rows_pdf = rows_pdf
-        #print(rows_pdf)
         return rows_pdf
 
     def parse(self, pattern = None):
@@ -55,7 +56,6 @@ class ParseCorretagem():
         block = self.rows_pdf
         row_pattern = self.default_row_pattern if pattern is None else pattern
         self.parsed_pdf = row_pattern.searchString(block)
-        #print(self.parsed_pdf)
         return self.parsed_pdf
     
     def get_df(self):
@@ -72,10 +72,24 @@ class ParseCorretagem():
             self.pd_parsed_pdf = pdParsedPdf
         return self.pd_parsed_pdf
     
+    def setup_b3_info(self, asset, amount, mean_price):
+        url = b3_url_search + b3_query_search(asset)
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200 and res.json()['results']:
+            b3_info = res.json()['results'][0]
+            return f"{amount} Ações {b3_info.get('companyName', '').strip()} ({b3_info.get('cnpj', '')}) - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
+
+        url = b3_url_funds_search + b3_query_funds_search(asset)
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200 and res.json():
+            b3_info = res.json()
+            return f"{amount} Ações {b3_info['detailFund'].get('companyName', '').strip()} ({b3_info['detailFund'].get('cnpj', '')}) - ADM {b3_info['shareHolder'].get('shareHolderName', '').strip()} - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
+        return ''
+    
     def mean_price(self):
         pdParsedPdf = self.get_df()
         assets = pdParsedPdf['Nome'].unique()
-        mean_df = pd.DataFrame([], columns = ['Nome', 'Quantidade', 'Preço Médio', 'Posição Final'])
+        mean_df = pd.DataFrame([], columns = ['Nome', 'Quantidade', 'Preço Médio', 'Posição Final', 'IR Info'])
         for asset in assets:
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset) & (pdParsedPdf['Tipo'] == 'C')]
             mean_price = subDf.groupby('Nome').apply(lambda df: round(np.average(df['Preço'], weights=df['Quantidade']), 2)).values[0]
@@ -85,7 +99,8 @@ class ParseCorretagem():
             position = round((subDf['Preço']*subDf['Quantidade']).sum(), 2)
             if notional == 0: position = 0
 
-            mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': notional, 'Preço Médio': mean_price, 'Posição Final': position } 
+            b3_info = self.setup_b3_info(asset, notional, mean_price)
+            mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': notional, 'Preço Médio': mean_price, 'Posição Final': position, 'IR Info': b3_info } 
         return mean_df
 
     def trade_gain_and_losses(self):

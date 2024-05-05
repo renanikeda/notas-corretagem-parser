@@ -1,4 +1,6 @@
+import base64
 import re
+
 regex_date = r'\d{2}/\d{2}/\d{4}'
 
 def parse_number(token):
@@ -26,6 +28,12 @@ def parse_asset_name(token):
 start_asset_name = r'FRACIONADO|VISTA'
 end_asset_name = r'\s(CI|PNB|UNT|PB|ON|PNA|PN)\s'
 
+
+b3_url_search = "https://sistemaswebb3-listados.b3.com.br/listedCompaniesProxy/CompanyCall/GetInitialCompanies/"
+b3_query_search = lambda company: base64.urlsafe_b64encode(str.encode(f'{{"language":"pt-br","pageNumber":1,"pageSize":20,"company":"{company}"}}')).decode()
+
+b3_url_funds_search = "https://sistemaswebb3-listados.b3.com.br/fundsProxy/fundsCall/GetDetailFundSIG/"
+b3_query_funds_search = lambda fund: base64.urlsafe_b64encode(str.encode(f'{{"typeFund":7,"cnpj":"0","identifierFund":"{re.sub(r"[0-9]+", "", fund)}"}}')).decode()
 b3_ticker = r'[a-zA-Z]{4}\d{1,2}'
 de_para_ticker = {
     'BRADESPAR': 'BRAP4',
