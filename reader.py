@@ -14,7 +14,7 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class ParseCorretagem():
-    def __init__(self, path = "12_2022.pdf", start_line = '1-BOVESPA', start_block = r'Negócios realizados.*Ajuste D/C', end_block = r'NOTA DE NEGOCIAÇÃO.*'):
+    def __init__(self, path = "12_2022.pdf", start_line = r'[0-9]-BOVESPA', start_block = r'Negócios realizados.*Ajuste D/C', end_block = r'NOTA DE NEGOCIAÇÃO.*'):
         self.path = path
         files_path = []
         if (path.split('.')[-1] == 'pdf'):
