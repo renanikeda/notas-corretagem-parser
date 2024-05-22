@@ -54,5 +54,6 @@ de_para_ticker = {
     'UNIPAR': 'UNIP6',
     'WIZ CO': 'WIZC3',
     'CSNMINERACAO': 'CMIN3',
-    'BBSEGURIDADE': 'BBSE3'
+    'BBSEGURIDADE': 'BBSE3',
+    'SPARTA INFRA': 'JURO11'
 }

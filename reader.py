@@ -14,7 +14,7 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class ParseCorretagem():
-    def __init__(self, path = "12_2022.pdf", start_line = r'(1|7)-BOVESPA', start_block = r'Negócios realizados.*Ajuste D/C', end_block = r'NOTA DE NEGOCIAÇÃO.*'):
+    def __init__(self, path = "12_2022.pdf", start_line = r'[0-9]-BOVESPA', start_block = r'Negócios realizados.*Ajuste D/C', end_block = r'NOTA DE NEGOCIAÇÃO.*'):
         self.path = path
         files_path = []
         if (path.split('.')[-1] == 'pdf'):
@@ -30,7 +30,7 @@ class ParseCorretagem():
         self.start_line = start_line
         self.start_block = start_block
         self.end_block = end_block
-        self.default_row_pattern = pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('1-BOVESPA')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(start_asset_name)) + pp.SkipTo(pp.Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + pp.Suppress(pp.SkipTo(pp.Word(pp.printables) + pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.printables).set_parse_action(filter_obs)('Obs') + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number)
+        self.default_row_pattern = pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('BOVESPA')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(start_asset_name)) + pp.SkipTo(pp.Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + pp.Suppress(pp.SkipTo(pp.Word(pp.printables) + pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.printables).set_parse_action(filter_obs)('Obs') + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number)
         self.columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
         self.parsed_pdf = None
         self.pd_parsed_pdf = pd.DataFrame()
@@ -45,7 +45,7 @@ class ParseCorretagem():
                 data_trade = re.search(r'(?<=Data pregão) ' + regex_date, text_page)
                 data_trade = data_trade.group() if data_trade else ''
                 text_page = re.sub(self.start_block + '|' + self.end_block + '|', '', text_page)
-                text_page = re.sub(self.start_line, '\n' + data_trade + ' ' + self.start_line, text_page)
+                text_page = re.sub(self.start_line, '\n' + data_trade + ' ' + self.start_line.replace('[0-9]-',''), text_page)
                 rows_pdf += text_page
         self.rows_pdf = rows_pdf
         return rows_pdf
