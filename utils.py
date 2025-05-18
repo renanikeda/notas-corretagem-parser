@@ -44,7 +44,7 @@ de_para_ticker = {
     'ITAUUNIBANCO': 'ITUB4',
     'USIMINAS': 'USIM5',
     'BRASIL': 'BBAS3',
-    'TRAN PAULIST': 'TRPL4',
+    'TRAN PAULIST': 'ISAE4',
     'PETROBRAS': 'PETR4',
     'SANEPAR': 'SAPR4',
     'B3': 'B3SA3',

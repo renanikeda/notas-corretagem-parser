@@ -5,6 +5,7 @@ import pyparsing as pp
 import pandas as pd
 import numpy as np
 import requests
+import random
 import time
 import os
 import re
@@ -36,7 +37,28 @@ class ParseCorretagem():
         self.parsed_pdf = None
         self.pd_parsed_pdf = pd.DataFrame()
         self.rows_pdf = None
-    
+
+    def generate_summary_file(self):
+        pdParsedPdf = self.get_trades_with_subscription()
+        pdMeanPdf = self.mean_price()
+        pdMeanPdf = self.add_b3_info_to_mean_price()
+        
+        pdTradesPdf = self.trade_gain_and_losses()
+
+        file_to_save = f"Notas_Parseadas_{datetime.now().year}.xlsx"
+        file_already_exists = file_to_save in os.listdir()
+
+        mode = 'a' if file_already_exists else 'w'
+        if_sheet_exists = 'replace' if file_already_exists else None 
+
+        writer = pd.ExcelWriter(file_to_save, engine = 'openpyxl', mode = mode, if_sheet_exists = if_sheet_exists)
+
+        pdParsedPdf.to_excel(writer, sheet_name="Nota", index=False)
+        pdMeanPdf.to_excel(writer, sheet_name="Preco Medio", index=False)
+        pdTradesPdf.to_excel(writer, sheet_name="Ganhos e Perdas", index=False)
+        writer.close()
+        print('Saved!')
+
     def transform_subsciption_to_trade(self, full_path = ''):
         original_columns = ['Nome', 'Preço', 'Quantidade', 'Data Trade']
         trade_columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
@@ -124,13 +146,21 @@ class ParseCorretagem():
             mean_price = subDf.groupby('Nome').apply(lambda df: round(np.average(df['Preço'], weights=df['Quantidade']), 2)).values[0]
 
             subDf = pdParsedPdf[pdParsedPdf['Nome'] == asset]
-            notional = (subDf['Quantidade'].sum(numeric_only = True))
+            quantity = (subDf['Quantidade'].sum(numeric_only = True))
             position = round((subDf['Preço']*subDf['Quantidade']).sum(), 2)
-            if notional == 0: position = 0
-            time.sleep(0.25)
-            b3_info = self.setup_b3_info(asset, notional, mean_price)
-            mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': notional, 'Preço Médio': mean_price, 'Posição Final': position, 'IR Info': b3_info } 
+            if quantity == 0: position = 0
+            
+            mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': quantity, 'Preço Médio': mean_price, 'Posição Final': position } 
+        self.mean_df = mean_df
         return mean_df
+
+    def add_b3_info_to_mean_price(self):
+        final_mean_df = pd.DataFrame([], columns = self.mean_df.columns)
+        for _, row in self.mean_df.iterrows():
+            b3_info = self.setup_b3_info(row['Nome'], row['Quantidade'], row['Preço Médio'])
+            final_mean_df = final_mean_df._append({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'IR Info': b3_info }, ignore_index = True)
+            time.sleep(random.randint(200, 1000)*0.001)
+        return final_mean_df
 
     def trade_gain_and_losses(self):
         pdParsedPdf = self.get_trades()
@@ -154,23 +184,4 @@ class ParseCorretagem():
         return gainLossDf
 
 parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
-
-# print(parsePDF.get_trades_with_subscription())
-# parsePDF = ParseCorretagem(f'C:/Users/renan/OneDrive/Documentos/PYTHON/Corretagem reader/IR ZILDA')
-pdParsedPdf = parsePDF.get_trades_with_subscription()
-pdMeanPdf = parsePDF.mean_price()
-pdTradesPdf = parsePDF.trade_gain_and_losses()
-
-file_to_save = f"Notas_Parseadas_{datetime.now().year}.xlsx"
-file_already_exists = file_to_save in os.listdir()
-
-mode = 'a' if file_already_exists else 'w'
-if_sheet_exists = 'replace' if file_already_exists else None 
-
-writer = pd.ExcelWriter(file_to_save, engine = 'openpyxl', mode = mode, if_sheet_exists = if_sheet_exists)
-
-pdParsedPdf.to_excel(writer, sheet_name="Nota", index=False)
-pdMeanPdf.to_excel(writer, sheet_name="Preco Medio", index=False)
-pdTradesPdf.to_excel(writer, sheet_name="Ganhos e Perdas", index=False)
-writer.close()
-print('Saved!')
+parsePDF.generate_summary_file()
