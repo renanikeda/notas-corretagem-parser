@@ -5,7 +5,7 @@ import pyparsing as pp
 import pandas as pd
 import numpy as np
 import requests
-import base64
+import time
 import os
 import re
 
@@ -36,6 +36,22 @@ class ParseCorretagem():
         self.parsed_pdf = None
         self.pd_parsed_pdf = pd.DataFrame()
         self.rows_pdf = None
+    
+    def transform_subsciption_to_trade(self, full_path = ''):
+        original_columns = ['Nome', 'Preço', 'Quantidade', 'Data Trade']
+        trade_columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
+        path = self.path + '/subscricoes.csv' if not full_path else full_path
+        
+        if not 'subscricoes.csv' in os.listdir(self.path): return pd.DataFrame(columns=trade_columns)
+        df = pd.read_csv(path, sep=',', header=None)
+        df.columns = original_columns
+        df['Preço'] = df['Preço'].str.replace(',', '.').astype(float)
+        df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce')
+        df['Tipo'] = 'C'
+        df['Obs'] = 'N'
+        df['Total'] = df['Preço'] * df['Quantidade']
+        df = df[trade_columns]
+        return df
 
     def generate_rows(self):
         rows_pdf = ''
@@ -59,7 +75,7 @@ class ParseCorretagem():
         self.parsed_pdf = row_pattern.searchString(block)
         return self.parsed_pdf
     
-    def get_df(self):
+    def get_trades(self):
         if not self.parsed_pdf:
             self.parse()
         if self.pd_parsed_pdf.empty:
@@ -72,7 +88,14 @@ class ParseCorretagem():
             pdParsedPdf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
             self.pd_parsed_pdf = pdParsedPdf
         return self.pd_parsed_pdf
-    
+
+    def get_trades_with_subscription(self, full_path = ''):
+        self.get_trades()
+        subscriptions_df = self.transform_subsciption_to_trade(full_path)
+        self.pd_parsed_pdf = self.pd_parsed_pdf._append(subscriptions_df, ignore_index = True)
+        self.pd_parsed_pdf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
+        return self.pd_parsed_pdf
+       
     def setup_b3_info(self, asset, amount, mean_price):
         try:
             url = b3_url_search + b3_query_search(asset)
@@ -91,9 +114,9 @@ class ParseCorretagem():
         except:
             print(f"Asset {asset} not found in B3")
             return f"{amount} Ações - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
-    
+        
     def mean_price(self):
-        pdParsedPdf = self.get_df()
+        pdParsedPdf = self.get_trades()
         assets = pdParsedPdf['Nome'].unique()
         mean_df = pd.DataFrame([], columns = ['Nome', 'Quantidade', 'Preço Médio', 'Posição Final', 'IR Info'])
         for asset in assets:
@@ -104,13 +127,13 @@ class ParseCorretagem():
             notional = (subDf['Quantidade'].sum(numeric_only = True))
             position = round((subDf['Preço']*subDf['Quantidade']).sum(), 2)
             if notional == 0: position = 0
-
+            time.sleep(0.25)
             b3_info = self.setup_b3_info(asset, notional, mean_price)
             mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': notional, 'Preço Médio': mean_price, 'Posição Final': position, 'IR Info': b3_info } 
         return mean_df
 
     def trade_gain_and_losses(self):
-        pdParsedPdf = self.get_df()
+        pdParsedPdf = self.get_trades()
         assets = pdParsedPdf['Nome'].unique()
         columns_gain_loss = ['Data Trade', 'Nome', 'Quantidade', 'Operação', 'Preço Médio', 'Preço Venda', 'Lucros ou Prejuizos']
         gainLossDf = pd.DataFrame(columns = columns_gain_loss)
@@ -131,8 +154,10 @@ class ParseCorretagem():
         return gainLossDf
 
 parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
+
+# print(parsePDF.get_trades_with_subscription())
 # parsePDF = ParseCorretagem(f'C:/Users/renan/OneDrive/Documentos/PYTHON/Corretagem reader/IR ZILDA')
-pdParsedPdf = parsePDF.get_df()
+pdParsedPdf = parsePDF.get_trades_with_subscription()
 pdMeanPdf = parsePDF.mean_price()
 pdTradesPdf = parsePDF.trade_gain_and_losses()
 
