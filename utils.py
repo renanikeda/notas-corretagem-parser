@@ -55,5 +55,12 @@ de_para_ticker = {
     'WIZ CO': 'WIZC3',
     'CSNMINERACAO': 'CMIN3',
     'BBSEGURIDADE': 'BBSE3',
-    'SPARTA INFRA': 'JURO11'
+    'SPARTA INFRA': 'JURO11',
+    'BOA SAFRA': 'SOJA3',
+    'VALE': 'VALE3',
+    'JALLESMACHAD': 'JALL3',
+    'ENGIE BRASIL': 'ENGIE3',
+    'HASHDEX NCI': 'HASH11',
+    'VULCABRAS': 'VULC3',
+    'UNIFIQUE': 'FIQE3',
 }

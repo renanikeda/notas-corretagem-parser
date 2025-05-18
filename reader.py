@@ -12,13 +12,14 @@ import re
 pd.options.mode.chained_assignment = None
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=DeprecationWarning)
 
 class ParseCorretagem():
     def __init__(self, path = "12_2022.pdf", start_line = r'[0-9]-BOVESPA', start_block = r'Negócios realizados.*Ajuste D/C', end_block = r'NOTA DE NEGOCIAÇÃO.*'):
         self.path = path
         files_path = []
         if (path.split('.')[-1] == 'pdf'):
-            files_path.append(path)
+            files_path._append(path)
         else:
             for broker in filter(lambda dir: '.' not in dir, os.listdir(self.path)):
                 for file_year in os.listdir(f'{self.path}/{broker}'):
@@ -35,7 +36,7 @@ class ParseCorretagem():
         self.parsed_pdf = None
         self.pd_parsed_pdf = pd.DataFrame()
         self.rows_pdf = None
-            
+
     def generate_rows(self):
         rows_pdf = ''
         for reader in self.readers:
@@ -73,18 +74,23 @@ class ParseCorretagem():
         return self.pd_parsed_pdf
     
     def setup_b3_info(self, asset, amount, mean_price):
-        url = b3_url_search + b3_query_search(asset)
-        res = requests.get(url, timeout=5)
-        if res.status_code == 200 and res.json()['results']:
-            b3_info = res.json()['results'][0]
-            return f"{amount} Ações {b3_info.get('companyName', '').strip()} ({b3_info.get('cnpj', '')}) - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
+        try:
+            url = b3_url_search + b3_query_search(asset)
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200 and res.json()['results']:
+                b3_info = res.json()['results'][0]
+                return f"{amount} Ações {b3_info.get('companyName', '').strip()} ({b3_info.get('cnpj', '')}) - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
 
-        url = b3_url_funds_search + b3_query_funds_search(asset)
-        res = requests.get(url, timeout=5)
-        if res.status_code == 200 and res.json():
-            b3_info = res.json()
-            return f"{amount} Ações {b3_info['detailFund'].get('companyName', '').strip()} ({b3_info['detailFund'].get('cnpj', '')}) - ADM {b3_info['shareHolder'].get('shareHolderName', '').strip()} - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
-        return ''
+            url = b3_url_funds_search + b3_query_funds_search(asset)
+            res = requests.get(url, timeout=5)
+            
+            if res.status_code == 200 and res.json():
+                b3_info = res.json()
+                return f"{amount} Ações {b3_info['detailFund'].get('companyName', '').strip()} ({b3_info['detailFund'].get('cnpj', '')}) - ADM {b3_info['shareHolder'].get('shareHolderName', '').strip()} - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
+            return ''
+        except:
+            print(f"Asset {asset} not found in B3")
+            return f"{amount} Ações - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
     
     def mean_price(self):
         pdParsedPdf = self.get_df()
@@ -120,11 +126,12 @@ class ParseCorretagem():
                     current_mean_price = sum_price / count if count > 0 else 0
                     selling_price = rowSubDf['Preço']
                     gain_loss = (selling_price - current_mean_price) * abs(rowSubDf['Quantidade'])
-                    gainLossDf = gainLossDf.append({'Data Trade': rowSubDf['Data Trade'], 'Nome': rowSubDf['Nome'], 'Operação': rowSubDf['Obs'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, ignore_index = True)
+                    gainLossDf = gainLossDf._append({'Data Trade': rowSubDf['Data Trade'], 'Nome': rowSubDf['Nome'], 'Operação': rowSubDf['Obs'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, ignore_index = True)
                     gainLossDf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
         return gainLossDf
 
 parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
+# parsePDF = ParseCorretagem(f'C:/Users/renan/OneDrive/Documentos/PYTHON/Corretagem reader/IR ZILDA')
 pdParsedPdf = parsePDF.get_df()
 pdMeanPdf = parsePDF.mean_price()
 pdTradesPdf = parsePDF.trade_gain_and_losses()
