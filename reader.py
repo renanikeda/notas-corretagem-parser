@@ -110,6 +110,9 @@ class ParseCorretagem():
             pdParsedPdf['Valor Liquido'] = pdParsedPdf['Valor Liquido'].astype(float)
 
             pdParsedPdf['Nome'] = pdParsedPdf['Nome'].apply(lambda nome: de_para_ticker.get(nome.strip(), nome.strip()))
+
+            pdParsedPdf['Ano'] = pd.to_datetime(pdParsedPdf['Data Trade'], dayfirst=True).dt.year
+            pdParsedPdf = pdParsedPdf.groupby(['Nome', 'Tipo', 'Ano']).agg({ 'Valor Bruto': 'sum', 'Valor IR': 'sum', 'Valor Liquido': 'sum', 'Data Trade': 'min'}).reset_index()
             pdParsedPdf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
             self.pd_parsed_pdf = pdParsedPdf
         return self.pd_parsed_pdf
