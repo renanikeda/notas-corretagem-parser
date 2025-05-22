@@ -1,6 +1,6 @@
-from PyPDF2 import PdfReader
-from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search, FileType
+from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search, provento_types, special_chars_to_replace, block_definition, row_definition, FileType
 from datetime import datetime
+from PyPDF2 import PdfReader
 import pyparsing as pp
 import pandas as pd
 import numpy as np
@@ -18,62 +18,55 @@ warnings.simplefilter(action='ignore', category=DeprecationWarning)
 class ParseCorretagem():
     def __init__(self, path = "12_2022.pdf"):
         self.path = path
-        self.replace_special_chars = '\xa0'
-        self.parsed_pdf = None
-        self.pd_parsed_pdf = pd.DataFrame()
-        self.rows_pdf = None
+        self.reset_cache()
     
     def reset_cache(self):
         self.parsed_pdf = None
         self.pd_parsed_pdf = pd.DataFrame()
         self.rows_pdf = None
         
-    def get_reader(self, file_type = FileType.NOTAS):
+    def get_reader(self, file_type = FileType.NOTAS, filter_years_list = []):
         files_path = []
         file_type_dir = "Notas de Corretagem" if file_type == FileType.NOTAS else "Proventos"
+
         if (self.path.split('.')[-1] == 'pdf'):
             files_path._append(self.path)
         else:
             for broker in filter(lambda dir: '.' not in dir, os.listdir(self.path)):
                 for file_year in os.listdir(f'{self.path}/{broker}'):
-                    # if file_year != '2024': continue
-                    print(f'Seaching path {self.path}/{broker}/{file_year}/{file_type_dir}/*.pdf')
-                    files = filter(lambda file: '.pdf' in file, os.listdir(f'{self.path}/{broker}/{file_year}/{file_type_dir}'))
-                    files_path = [*files_path, *list(map(lambda file: f'{self.path}/{broker}/{file_year}/{file_type_dir}/{file}', files))]
+                    if filter_years_list and file_year not in filter_years_list: continue
+
+                    full_path = f"{self.path}/{broker}/{file_year}/{file_type_dir}"
+                    print(f'Seaching path {full_path}/*.pdf')
+                    files = filter(lambda file: '.pdf' in file, os.listdir(f'{full_path}'))
+                    files_path = [*files_path, *list(map(lambda file: f'{full_path}/{file}', files))]
+
             self.readers = [PdfReader(file) for file in files_path]
+
         return self.readers
 
     def generate_rows(self, file_type = FileType.NOTAS):
         self.get_reader(file_type)
-        start_line = r'[0-9]-BOVESPA'
-        start_block = r'Negócios realizados.*Ajuste D/C'
-        end_block = r'NOTA DE NEGOCIAÇÃO.*'
-        if file_type == FileType.RENDIMENTOS:
-            start_line = r'[a-zA-Z0-9]'
-            start_block = r'Pagamento'
-            end_block = r'INFORMAÇÕES COMPLEMENTARES'
-
+        block = block_definition[file_type]
         rows_pdf = ''
         for reader in self.readers:
             for page in reader.pages:
                 text_page = page.extract_text()
-                text_page = re.sub(self.replace_special_chars, '', text_page)
+                text_page = re.sub(special_chars_to_replace, '', text_page)
                 text_page = re.sub('\n+', ' ', text_page)
                 if file_type == FileType.NOTAS:
                     data_trade = re.search(r'(?<=Data pregão) ' + regex_date, text_page)
                     data_trade = data_trade.group() if data_trade else ''
-                    text_page = re.sub(start_line, '\n' + data_trade + ' ' + start_line.replace('[0-9]-',''), text_page)
+                    text_page = re.sub(block['start_line'], '\n' + data_trade + ' ' + block['start_line'].replace('[0-9]-',''), text_page)
 
-                text_page = re.sub(start_block + '|' + end_block + '|', '', text_page)
+                text_page = re.sub(block['start_block'] + '|' + block['end_block'] + '|', '', text_page)
                 rows_pdf += text_page
         self.rows_pdf = rows_pdf
-        # print(self.rows_pdf)
+
         return rows_pdf
 
     def parse(self, file_type = FileType.NOTAS, pattern = None):
-        self.default_row_pattern = pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('BOVESPA')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(start_asset_name)) + pp.SkipTo(pp.Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + pp.Suppress(pp.SkipTo(pp.Word(pp.printables) + pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.printables).set_parse_action(filter_obs)('Obs') + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number)
-        if file_type == FileType.RENDIMENTOS:
-            self.default_row_pattern = pp.Word(pp.alphanums)('nome') + pp.Regex('RENDIMENTO|DIVIDENDO|JCP|SUBSCRICAO') + pp.Suppress(pp.SkipTo(pp.Word(pp.nums), include = False, fail_on='\n')) + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('valor_bruto').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('valor_ir').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('valor_liquido').set_parse_action(parse_number) + pp.Regex(regex_date)('data_trade')
+        self.default_row_pattern = row_definition[file_type]
         if not self.rows_pdf:
             self.generate_rows(file_type)
         block = self.rows_pdf
@@ -207,6 +200,7 @@ class ParseCorretagem():
         pdParsedPdf.to_excel(writer, sheet_name="Nota", index=False)
         pdMeanPdf.to_excel(writer, sheet_name="Preco Medio", index=False)
         pdTradesPdf.to_excel(writer, sheet_name="Ganhos e Perdas", index=False)
+
         self.reset_cache()
         pdRendimentosPdf = self.get_rendimentos()
         pdRendimentosPdf.to_excel(writer, sheet_name="Rendimentos", index=False)
@@ -229,11 +223,6 @@ class ParseCorretagem():
         df = df[trade_columns]
         return df
 
-# parseRendimentosPDF = ParseRendimentos(f'D:/User/Documentos/IR')
-# print(parseRendimentosPDF.parse())
-# print(parseRendimentosPDF.get_rendimentos())
-parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
+# parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
+parsePDF = ParseCorretagem(f'./IR')
 parsePDF.generate_summary_file()
-# parsePDF.parse(FileType.NOTAS)
-# print(parsePDF.get_rendimentos())
-# print(parsePDF.get_trades())
