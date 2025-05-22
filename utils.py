@@ -1,5 +1,6 @@
 import base64
 import re
+from enum import Enum
 
 regex_date = r'\d{2}/\d{2}/\d{4}'
 
@@ -35,7 +36,7 @@ b3_query_search = lambda company: base64.urlsafe_b64encode(str.encode(f'{{"langu
 b3_url_funds_search = "https://sistemaswebb3-listados.b3.com.br/fundsProxy/fundsCall/GetDetailFundSIG/"
 b3_query_funds_search = lambda fund: base64.urlsafe_b64encode(str.encode(f'{{"typeFund":7,"cnpj":"0","identifierFund":"{re.sub(r"[0-9]+", "", fund)}"}}')).decode()
 b3_ticker = r'[a-zA-Z]{4}\d{1,2}'
-de_para_ticker = {
+de_para_ticker_original = {
     'BRADESPAR': 'BRAP4',
     'TAESA': 'TAEE11',
     'BRASKEM': 'BRKM5',
@@ -63,4 +64,26 @@ de_para_ticker = {
     'HASHDEX NCI': 'HASH11',
     'VULCABRAS': 'VULC3',
     'UNIFIQUE': 'FIQE3',
+    'FII BRESCO': 'BRCO11',
+    'FII DEVANT': 'DEVA11',
+    'FII HGRU PAX': 'HGRU11',
+    'FII KINEA': 'KNRI11',
+    'FII MALLS BP': 'MALL11',
+    'FII MAXI REN': "MXRF11",
+    'FII XP MALLS': "XPML11",
+    'SPARTA INFRA': 'JURO11'
 }
+def expand_dict(data: dict) -> dict:
+    result = data.copy()
+    for key in data:
+        if isinstance(key, str):
+            no_space_key = key.replace(" ", "")
+            if no_space_key != key:
+                result[no_space_key] = data[key]
+    return result
+
+de_para_ticker = expand_dict(de_para_ticker_original)
+
+class FileType(Enum):
+    NOTAS = 1
+    RENDIMENTOS = 2

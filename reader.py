@@ -1,5 +1,5 @@
 from PyPDF2 import PdfReader
-from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search
+from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search, FileType
 from datetime import datetime
 import pyparsing as pp
 import pandas as pd
@@ -16,82 +16,66 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=DeprecationWarning)
 
 class ParseCorretagem():
-    def __init__(self, path = "12_2022.pdf", start_line = r'[0-9]-BOVESPA', start_block = r'Negócios realizados.*Ajuste D/C', end_block = r'NOTA DE NEGOCIAÇÃO.*'):
+    def __init__(self, path = "12_2022.pdf"):
         self.path = path
-        files_path = []
-        if (path.split('.')[-1] == 'pdf'):
-            files_path._append(path)
-        else:
-            for broker in filter(lambda dir: '.' not in dir, os.listdir(self.path)):
-                for file_year in os.listdir(f'{self.path}/{broker}'):
-                    print(f'Seaching path {self.path}/{broker}/{file_year}/Notas de Corretagem/*.pdf')
-                    files = filter(lambda file: '.pdf' in file, os.listdir(f'{self.path}/{broker}/{file_year}/Notas de Corretagem'))
-                    files_path = [*files_path, *list(map(lambda file: f'{self.path}/{broker}/{file_year}/Notas de Corretagem/{file}', files))]
-        # print(files_path)
-        self.readers = [PdfReader(file) for file in files_path]
-        self.start_line = start_line
-        self.start_block = start_block
-        self.end_block = end_block
-        self.default_row_pattern = pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('BOVESPA')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(start_asset_name)) + pp.SkipTo(pp.Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + pp.Suppress(pp.SkipTo(pp.Word(pp.printables) + pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.printables).set_parse_action(filter_obs)('Obs') + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number)
-        self.columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
+        self.replace_special_chars = '\xa0'
         self.parsed_pdf = None
         self.pd_parsed_pdf = pd.DataFrame()
         self.rows_pdf = None
-
-    def generate_summary_file(self):
-        pdParsedPdf = self.get_trades_with_subscription()
-        pdMeanPdf = self.mean_price()
-        pdMeanPdf = self.add_b3_info_to_mean_price()
+    
+    def reset_cache(self):
+        self.parsed_pdf = None
+        self.pd_parsed_pdf = pd.DataFrame()
+        self.rows_pdf = None
         
-        pdTradesPdf = self.trade_gain_and_losses()
+    def get_reader(self, file_type = FileType.NOTAS):
+        files_path = []
+        file_type_dir = "Notas de Corretagem" if file_type == FileType.NOTAS else "Proventos"
+        if (self.path.split('.')[-1] == 'pdf'):
+            files_path._append(self.path)
+        else:
+            for broker in filter(lambda dir: '.' not in dir, os.listdir(self.path)):
+                for file_year in os.listdir(f'{self.path}/{broker}'):
+                    # if file_year != '2024': continue
+                    print(f'Seaching path {self.path}/{broker}/{file_year}/{file_type_dir}/*.pdf')
+                    files = filter(lambda file: '.pdf' in file, os.listdir(f'{self.path}/{broker}/{file_year}/{file_type_dir}'))
+                    files_path = [*files_path, *list(map(lambda file: f'{self.path}/{broker}/{file_year}/{file_type_dir}/{file}', files))]
+            self.readers = [PdfReader(file) for file in files_path]
+        return self.readers
 
-        file_to_save = f"Notas_Parseadas_{datetime.now().year}.xlsx"
-        file_already_exists = file_to_save in os.listdir()
+    def generate_rows(self, file_type = FileType.NOTAS):
+        self.get_reader(file_type)
+        start_line = r'[0-9]-BOVESPA'
+        start_block = r'Negócios realizados.*Ajuste D/C'
+        end_block = r'NOTA DE NEGOCIAÇÃO.*'
+        if file_type == FileType.RENDIMENTOS:
+            start_line = r'[a-zA-Z0-9]'
+            start_block = r'Pagamento'
+            end_block = r'INFORMAÇÕES COMPLEMENTARES'
 
-        mode = 'a' if file_already_exists else 'w'
-        if_sheet_exists = 'replace' if file_already_exists else None 
-
-        writer = pd.ExcelWriter(file_to_save, engine = 'openpyxl', mode = mode, if_sheet_exists = if_sheet_exists)
-
-        pdParsedPdf.to_excel(writer, sheet_name="Nota", index=False)
-        pdMeanPdf.to_excel(writer, sheet_name="Preco Medio", index=False)
-        pdTradesPdf.to_excel(writer, sheet_name="Ganhos e Perdas", index=False)
-        writer.close()
-        print('Saved!')
-
-    def transform_subsciption_to_trade(self, full_path = ''):
-        original_columns = ['Nome', 'Preço', 'Quantidade', 'Data Trade']
-        trade_columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
-        path = self.path + '/subscricoes.csv' if not full_path else full_path
-        
-        if not 'subscricoes.csv' in os.listdir(self.path): return pd.DataFrame(columns=trade_columns)
-        df = pd.read_csv(path, sep=',', header=None)
-        df.columns = original_columns
-        df['Preço'] = df['Preço'].str.replace(',', '.').astype(float)
-        df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce')
-        df['Tipo'] = 'C'
-        df['Obs'] = 'N'
-        df['Total'] = df['Preço'] * df['Quantidade']
-        df = df[trade_columns]
-        return df
-
-    def generate_rows(self):
         rows_pdf = ''
         for reader in self.readers:
             for page in reader.pages:
                 text_page = page.extract_text()
+                text_page = re.sub(self.replace_special_chars, '', text_page)
                 text_page = re.sub('\n+', ' ', text_page)
-                data_trade = re.search(r'(?<=Data pregão) ' + regex_date, text_page)
-                data_trade = data_trade.group() if data_trade else ''
-                text_page = re.sub(self.start_block + '|' + self.end_block + '|', '', text_page)
-                text_page = re.sub(self.start_line, '\n' + data_trade + ' ' + self.start_line.replace('[0-9]-',''), text_page)
+                if file_type == FileType.NOTAS:
+                    data_trade = re.search(r'(?<=Data pregão) ' + regex_date, text_page)
+                    data_trade = data_trade.group() if data_trade else ''
+                    text_page = re.sub(start_line, '\n' + data_trade + ' ' + start_line.replace('[0-9]-',''), text_page)
+
+                text_page = re.sub(start_block + '|' + end_block + '|', '', text_page)
                 rows_pdf += text_page
         self.rows_pdf = rows_pdf
+        # print(self.rows_pdf)
         return rows_pdf
 
-    def parse(self, pattern = None):
+    def parse(self, file_type = FileType.NOTAS, pattern = None):
+        self.default_row_pattern = pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('BOVESPA')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(start_asset_name)) + pp.SkipTo(pp.Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + pp.Suppress(pp.SkipTo(pp.Word(pp.printables) + pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.printables).set_parse_action(filter_obs)('Obs') + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number)
+        if file_type == FileType.RENDIMENTOS:
+            self.default_row_pattern = pp.Word(pp.alphanums)('nome') + pp.Regex('RENDIMENTO|DIVIDENDO|JCP|SUBSCRICAO') + pp.Suppress(pp.SkipTo(pp.Word(pp.nums), include = False, fail_on='\n')) + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('valor_bruto').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('valor_ir').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('valor_liquido').set_parse_action(parse_number) + pp.Regex(regex_date)('data_trade')
         if not self.rows_pdf:
-            self.generate_rows()
+            self.generate_rows(file_type)
         block = self.rows_pdf
         row_pattern = self.default_row_pattern if pattern is None else pattern
         self.parsed_pdf = row_pattern.searchString(block)
@@ -99,9 +83,10 @@ class ParseCorretagem():
     
     def get_trades(self):
         if not self.parsed_pdf:
-            self.parse()
+            self.parse(FileType.NOTAS)
+        columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
         if self.pd_parsed_pdf.empty:
-            pdParsedPdf = pd.DataFrame(self.parsed_pdf, columns = self.columns)
+            pdParsedPdf = pd.DataFrame(self.parsed_pdf, columns = columns)
             pdParsedPdf['Quantidade'] = pdParsedPdf['Quantidade'].astype(float)
             pdParsedPdf['Preço'] = pdParsedPdf['Preço'].astype(float)
             pdParsedPdf['Total'] = pdParsedPdf['Total'].astype(float)
@@ -110,7 +95,25 @@ class ParseCorretagem():
             pdParsedPdf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
             self.pd_parsed_pdf = pdParsedPdf
         return self.pd_parsed_pdf
+    
+    def get_rendimentos(self):
+        if not self.parsed_pdf:
+            self.parse(FileType.RENDIMENTOS)
+        columns = ['Nome', 'Tipo', 'Quantidade', 'Valor Bruto', 'Valor IR', 'Valor Liquido', 'Data Trade']
 
+        # print(self.parsed_pdf)
+        if self.pd_parsed_pdf.empty:
+            pdParsedPdf = pd.DataFrame(self.parsed_pdf, columns = columns)
+            pdParsedPdf['Quantidade'] = pdParsedPdf['Quantidade'].astype(float)
+            pdParsedPdf['Valor Bruto'] = pdParsedPdf['Valor Bruto'].astype(float)
+            pdParsedPdf['Valor IR'] = pdParsedPdf['Valor IR'].astype(float)
+            pdParsedPdf['Valor Liquido'] = pdParsedPdf['Valor Liquido'].astype(float)
+
+            pdParsedPdf['Nome'] = pdParsedPdf['Nome'].apply(lambda nome: de_para_ticker.get(nome.strip(), nome.strip()))
+            pdParsedPdf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
+            self.pd_parsed_pdf = pdParsedPdf
+        return self.pd_parsed_pdf
+    
     def get_trades_with_subscription(self, full_path = ''):
         self.get_trades()
         subscriptions_df = self.transform_subsciption_to_trade(full_path)
@@ -182,6 +185,52 @@ class ParseCorretagem():
                     gainLossDf = gainLossDf._append({'Data Trade': rowSubDf['Data Trade'], 'Nome': rowSubDf['Nome'], 'Operação': rowSubDf['Obs'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, ignore_index = True)
                     gainLossDf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
         return gainLossDf
+    
+    def generate_summary_file(self):
+        pdParsedPdf = self.get_trades_with_subscription()
+        pdMeanPdf = self.mean_price()
+        pdMeanPdf = self.add_b3_info_to_mean_price()
+        
+        pdTradesPdf = self.trade_gain_and_losses()
 
+        file_to_save = f"Notas_Parseadas_{datetime.now().year}.xlsx"
+        file_already_exists = file_to_save in os.listdir()
+
+        mode = 'a' if file_already_exists else 'w'
+        if_sheet_exists = 'replace' if file_already_exists else None 
+
+        writer = pd.ExcelWriter(file_to_save, engine = 'openpyxl', mode = mode, if_sheet_exists = if_sheet_exists)
+
+        pdParsedPdf.to_excel(writer, sheet_name="Nota", index=False)
+        pdMeanPdf.to_excel(writer, sheet_name="Preco Medio", index=False)
+        pdTradesPdf.to_excel(writer, sheet_name="Ganhos e Perdas", index=False)
+        self.reset_cache()
+        pdRendimentosPdf = self.get_rendimentos()
+        pdRendimentosPdf.to_excel(writer, sheet_name="Rendimentos", index=False)
+        writer.close()
+        print('Saved!')
+
+    def transform_subsciption_to_trade(self, full_path = ''):
+        original_columns = ['Nome', 'Preço', 'Quantidade', 'Data Trade']
+        trade_columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
+        path = self.path + '/subscricoes.csv' if not full_path else full_path
+        
+        if not 'subscricoes.csv' in os.listdir(self.path): return pd.DataFrame(columns=trade_columns)
+        df = pd.read_csv(path, sep=',', header=None)
+        df.columns = original_columns
+        df['Preço'] = df['Preço'].str.replace(',', '.').astype(float)
+        df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce')
+        df['Tipo'] = 'C'
+        df['Obs'] = 'N'
+        df['Total'] = df['Preço'] * df['Quantidade']
+        df = df[trade_columns]
+        return df
+
+# parseRendimentosPDF = ParseRendimentos(f'D:/User/Documentos/IR')
+# print(parseRendimentosPDF.parse())
+# print(parseRendimentosPDF.get_rendimentos())
 parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
 parsePDF.generate_summary_file()
+# parsePDF.parse(FileType.NOTAS)
+# print(parsePDF.get_rendimentos())
+# print(parsePDF.get_trades())
