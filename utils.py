@@ -40,7 +40,7 @@ provento_types = 'RENDIMENTO|DIVIDENDO|JCP|SUBSCRICAO'
 
 block_definition = {
     FileType.NOTAS: {
-        'start_line': r'[0-9]-BOVESPA',
+        'start_line': r'[0-9]-BOVESPA|LISTADO',
         'start_block': r'Negócios realizados.*Ajuste D/C',
         'end_block': r'NOTA DE NEGOCIAÇÃO.*',
     },
@@ -52,7 +52,7 @@ block_definition = {
 }
 
 row_definition = {
-    FileType.NOTAS: pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('BOVESPA')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(start_asset_name)) + pp.SkipTo(pp.Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + pp.Suppress(pp.SkipTo(pp.Word(pp.printables) + pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.printables).set_parse_action(filter_obs)('Obs') + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number),
+    FileType.NOTAS: pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('BOVESPA|LISTADO')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(start_asset_name)) + pp.SkipTo(pp.Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + pp.Suppress(pp.SkipTo(pp.Word(pp.printables) + pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.printables).set_parse_action(filter_obs)('Obs') + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number),
     FileType.RENDIMENTOS: pp.Word(pp.alphanums)('nome') + pp.Regex(provento_types) + pp.Suppress(pp.SkipTo(pp.Word(pp.nums), include = False, fail_on='\n')) + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('valor_bruto').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('valor_ir').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('valor_liquido').set_parse_action(parse_number) + pp.Regex(regex_date)('data_trade')
 }
 
