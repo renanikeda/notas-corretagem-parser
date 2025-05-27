@@ -1,3 +1,6 @@
 *.xlsx
 __pycache__
 **/
+IR
+IR*/
+IR*

@@ -2,6 +2,7 @@ from utils import regex_date, parse_number, filter_obs, start_asset_name, end_as
 from datetime import datetime
 from PyPDF2 import PdfReader
 import pyparsing as pp
+from copy import copy
 import pandas as pd
 import numpy as np
 import requests
@@ -16,8 +17,9 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=DeprecationWarning)
 
 class ParseCorretagem():
-    def __init__(self, path = "12_2022.pdf"):
+    def __init__(self, path = "12_2022.pdf", filter_years_list = []):
         self.path = path
+        self.filter_years_list = filter_years_list
         self.reset_cache()
     
     def reset_cache(self):
@@ -25,7 +27,7 @@ class ParseCorretagem():
         self.pd_parsed_pdf = pd.DataFrame()
         self.rows_pdf = None
         
-    def get_reader(self, file_type = FileType.NOTAS, filter_years_list = []):
+    def get_reader(self, file_type = FileType.NOTAS):
         files_path = []
         file_type_dir = "Notas de Corretagem" if file_type == FileType.NOTAS else "Proventos"
 
@@ -34,7 +36,7 @@ class ParseCorretagem():
         else:
             for broker in filter(lambda dir: '.' not in dir, os.listdir(self.path)):
                 for file_year in os.listdir(f'{self.path}/{broker}'):
-                    if filter_years_list and file_year not in filter_years_list: continue
+                    if self.filter_years_list and file_year not in self.filter_years_list: continue
 
                     full_path = f"{self.path}/{broker}/{file_year}/{file_type_dir}"
                     print(f'Seaching path {full_path}/*.pdf')
@@ -139,9 +141,11 @@ class ParseCorretagem():
     def mean_price(self):
         pdParsedPdf = self.get_trades()
         assets = pdParsedPdf['Nome'].unique()
-        mean_df = pd.DataFrame([], columns = ['Nome', 'Quantidade', 'Preço Médio', 'Posição Final', 'IR Info'])
+        mean_df = pd.DataFrame([], columns = ['Nome', 'Quantidade', 'Preço Médio', 'Posição Final'])
         for asset in assets:
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset) & (pdParsedPdf['Tipo'] == 'C')]
+            if subDf.empty: continue
+
             mean_price = subDf.groupby('Nome').apply(lambda df: round(np.average(df['Preço'], weights=df['Quantidade']), 2)).values[0]
 
             subDf = pdParsedPdf[pdParsedPdf['Nome'] == asset]
@@ -152,14 +156,6 @@ class ParseCorretagem():
             mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': quantity, 'Preço Médio': mean_price, 'Posição Final': position } 
         self.mean_df = mean_df
         return mean_df
-
-    def add_b3_info_to_mean_price(self):
-        final_mean_df = pd.DataFrame([], columns = self.mean_df.columns)
-        for _, row in self.mean_df.iterrows():
-            b3_info = self.setup_b3_info(row['Nome'], row['Quantidade'], row['Preço Médio'])
-            final_mean_df = final_mean_df._append({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'IR Info': b3_info }, ignore_index = True)
-            time.sleep(random.randint(200, 1000)*0.001)
-        return final_mean_df
 
     def trade_gain_and_losses(self):
         pdParsedPdf = self.get_trades()
@@ -182,12 +178,42 @@ class ParseCorretagem():
                     gainLossDf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
         return gainLossDf
     
+    def add_b3_info_to_mean_price(self):
+        final_mean_df = pd.DataFrame([], columns = [*self.mean_df.columns, "IR Info"])
+        for _, row in self.mean_df.iterrows():
+            b3_info = self.setup_b3_info(row['Nome'], row['Quantidade'], row['Preço Médio'])
+            final_mean_df = final_mean_df._append({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'DIVIDENDO': row['DIVIDENDO'], 'JCP': row['JCP'], 'RENDIMENTO': row['RENDIMENTO'], 'IR Info': copy(b3_info)}, ignore_index = True)
+            time.sleep(random.randint(200, 1000)*0.001)
+        final_mean_df['IR Info'] = final_mean_df['IR Info'].astype(str).str.strip()
+        return final_mean_df
+
+    def merge_mean_price_rendimentos(self, mean_df, rendimentos_pd, year):
+        new_mean_df = pd.DataFrame([], columns = [*self.mean_df.columns, *provento_types.split("|")])
+        filtered_rendimentos_pd = rendimentos_pd[rendimentos_pd["Ano"] == int(year)]
+
+        for _, row in self.mean_df.iterrows():
+            asset = row['Nome']
+            asset_rendimentos = filtered_rendimentos_pd[filtered_rendimentos_pd['Nome'] == asset]
+            rendimentos = dict(zip(asset_rendimentos['Tipo'], asset_rendimentos['Valor Liquido']))
+
+            new_mean_df = new_mean_df._append({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'DIVIDENDO': rendimentos.get('DIVIDENDO', ''),  'JCP': rendimentos.get('JCP', ''),  'RENDIMENTO': rendimentos.get('RENDIMENTO', '')}, ignore_index = True)
+            
+        self.mean_df = new_mean_df
+        return new_mean_df
+
     def generate_summary_file(self):
         pdParsedPdf = self.get_trades_with_subscription()
         pdMeanPdf = self.mean_price()
-        pdMeanPdf = self.add_b3_info_to_mean_price()
-        
+
         pdTradesPdf = self.trade_gain_and_losses()
+        self.reset_cache()
+        pdRendimentosPdf = self.get_rendimentos()
+
+        last_year = int(datetime.now().year) - 1
+        pdMeanPdf = self.merge_mean_price_rendimentos(pdMeanPdf, pdRendimentosPdf, last_year)
+
+
+        pdMeanPdf = self.add_b3_info_to_mean_price()
 
         file_to_save = f"Notas_Parseadas_{datetime.now().year}.xlsx"
         file_already_exists = file_to_save in os.listdir()
@@ -200,10 +226,9 @@ class ParseCorretagem():
         pdParsedPdf.to_excel(writer, sheet_name="Nota", index=False)
         pdMeanPdf.to_excel(writer, sheet_name="Preco Medio", index=False)
         pdTradesPdf.to_excel(writer, sheet_name="Ganhos e Perdas", index=False)
-
-        self.reset_cache()
-        pdRendimentosPdf = self.get_rendimentos()
         pdRendimentosPdf.to_excel(writer, sheet_name="Rendimentos", index=False)
+
+        
         writer.close()
         print('Saved!')
 
@@ -224,5 +249,5 @@ class ParseCorretagem():
         return df
 
 # parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
-parsePDF = ParseCorretagem(f'./IR')
+parsePDF = ParseCorretagem(f'./IR', filter_years_list = [])
 parsePDF.generate_summary_file()
