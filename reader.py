@@ -145,12 +145,11 @@ class ParseCorretagem():
         for asset in assets:
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset) & (pdParsedPdf['Tipo'] == 'C')]
             if subDf.empty: continue
-
             mean_price = subDf.groupby('Nome').apply(lambda df: round(np.average(df['Preço'], weights=df['Quantidade']), 2)).values[0]
 
             subDf = pdParsedPdf[pdParsedPdf['Nome'] == asset]
             quantity = (subDf['Quantidade'].sum(numeric_only = True))
-            position = round((subDf['Preço']*subDf['Quantidade']).sum(), 2)
+            position = round(quantity * mean_price, 2)
             if quantity == 0: position = 0
             
             mean_df.loc[len(mean_df)] = { 'Nome': asset, 'Quantidade': quantity, 'Preço Médio': mean_price, 'Posição Final': position } 
