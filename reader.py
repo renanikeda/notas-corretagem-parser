@@ -187,10 +187,10 @@ class ParseCorretagem():
         return final_mean_df
 
     def merge_mean_price_rendimentos(self, mean_df, rendimentos_pd, year):
-        new_mean_df = pd.DataFrame([], columns = [*self.mean_df.columns, *provento_types.split("|")])
+        new_mean_df = pd.DataFrame([], columns = [*mean_df.columns, *provento_types.split("|")])
         filtered_rendimentos_pd = rendimentos_pd[rendimentos_pd["Ano"] == int(year)]
 
-        for _, row in self.mean_df.iterrows():
+        for _, row in mean_df.iterrows():
             asset = row['Nome']
             asset_rendimentos = filtered_rendimentos_pd[filtered_rendimentos_pd['Nome'] == asset]
             rendimentos = dict(zip(asset_rendimentos['Tipo'], asset_rendimentos['Valor Liquido']))
@@ -206,6 +206,7 @@ class ParseCorretagem():
 
         pdTradesPdf = self.trade_gain_and_losses()
         self.reset_cache()
+        self.filter_years_list= ['2024']
         pdRendimentosPdf = self.get_rendimentos()
 
         last_year = int(datetime.now().year) - 1
@@ -246,7 +247,3 @@ class ParseCorretagem():
         df['Total'] = df['Preço'] * df['Quantidade']
         df = df[trade_columns]
         return df
-
-# parsePDF = ParseCorretagem(f'D:/User/Documentos/IR')
-parsePDF = ParseCorretagem(f'./IR', filter_years_list = [])
-parsePDF.generate_summary_file()
