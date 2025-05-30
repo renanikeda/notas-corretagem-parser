@@ -1,7 +1,6 @@
-from utils import regex_date, parse_number, filter_obs, start_asset_name, end_asset_name, parse_asset_name, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search, provento_types, special_chars_to_replace, block_definition, row_definition, FileType
+from utils import regex_date, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search, provento_types, special_chars_to_replace, block_definition, row_definition, trade_columns, subscription_columns, columns_gain_loss, FileType
 from datetime import datetime
 from PyPDF2 import PdfReader
-import pyparsing as pp
 from copy import copy
 import pandas as pd
 import numpy as np
@@ -79,9 +78,8 @@ class ParseCorretagem():
     def get_trades(self):
         if not self.parsed_pdf:
             self.parse(FileType.NOTAS)
-        columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
         if self.pd_parsed_pdf.empty:
-            pdParsedPdf = pd.DataFrame(self.parsed_pdf, columns = columns)
+            pdParsedPdf = pd.DataFrame(self.parsed_pdf, columns = trade_columns)
             pdParsedPdf['Quantidade'] = pdParsedPdf['Quantidade'].astype(float)
             pdParsedPdf['Preço'] = pdParsedPdf['Preço'].astype(float)
             pdParsedPdf['Total'] = pdParsedPdf['Total'].astype(float)
@@ -96,7 +94,6 @@ class ParseCorretagem():
             self.parse(FileType.RENDIMENTOS)
         columns = ['Nome', 'Tipo', 'Quantidade', 'Valor Bruto', 'Valor IR', 'Valor Liquido', 'Data Trade']
 
-        # print(self.parsed_pdf)
         if self.pd_parsed_pdf.empty:
             pdParsedPdf = pd.DataFrame(self.parsed_pdf, columns = columns)
             pdParsedPdf['Quantidade'] = pdParsedPdf['Quantidade'].astype(float)
@@ -159,7 +156,6 @@ class ParseCorretagem():
     def trade_gain_and_losses(self):
         pdParsedPdf = self.get_trades()
         assets = pdParsedPdf['Nome'].unique()
-        columns_gain_loss = ['Data Trade', 'Nome', 'Quantidade', 'Operação', 'Preço Médio', 'Preço Venda', 'Lucros ou Prejuizos']
         gainLossDf = pd.DataFrame(columns = columns_gain_loss)
         for asset in assets:
             subDf = pdParsedPdf[(pdParsedPdf['Nome'] == asset)]
@@ -183,11 +179,14 @@ class ParseCorretagem():
             b3_info = self.setup_b3_info(row['Nome'], row['Quantidade'], row['Preço Médio'])
             final_mean_df = final_mean_df._append({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'DIVIDENDO': row['DIVIDENDO'], 'JCP': row['JCP'], 'RENDIMENTO': row['RENDIMENTO'], 'IR Info': copy(b3_info)}, ignore_index = True)
             time.sleep(random.randint(200, 1000)*0.001)
-        final_mean_df['IR Info'] = final_mean_df['IR Info'].astype(str).str.strip()
+
         return final_mean_df
 
     def merge_mean_price_rendimentos(self, mean_df, rendimentos_pd, year):
-        new_mean_df = pd.DataFrame([], columns = [*mean_df.columns, *provento_types.split("|")])
+        columns = [*mean_df.columns, *provento_types.split("|")]
+        if 'SUBSCRICAO' in columns: columns.remove('SUBSCRICAO')
+
+        new_mean_df = pd.DataFrame([], columns = columns)
         filtered_rendimentos_pd = rendimentos_pd[rendimentos_pd["Ano"] == int(year)]
 
         for _, row in mean_df.iterrows():
@@ -233,13 +232,11 @@ class ParseCorretagem():
         print('Saved!')
 
     def transform_subsciption_to_trade(self, full_path = ''):
-        original_columns = ['Nome', 'Preço', 'Quantidade', 'Data Trade']
-        trade_columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
         path = self.path + '/subscricoes.csv' if not full_path else full_path
         
         if not 'subscricoes.csv' in os.listdir(self.path): return pd.DataFrame(columns=trade_columns)
         df = pd.read_csv(path, sep=',', header=None)
-        df.columns = original_columns
+        df.columns = subscription_columns
         df['Preço'] = df['Preço'].str.replace(',', '.').astype(float)
         df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce')
         df['Tipo'] = 'C'

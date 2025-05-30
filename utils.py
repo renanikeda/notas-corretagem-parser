@@ -1,7 +1,8 @@
 import base64
 import re
 from enum import Enum
-import pyparsing as pp
+from pyparsing import Regex, Suppress, Literal, Word, SkipTo, nums, alphanums, alphas, printables, White
+
 
 regex_date = r'\d{2}/\d{2}/\d{4}'
 
@@ -31,6 +32,9 @@ class FileType(Enum):
     NOTAS = 1
     RENDIMENTOS = 2
 
+trade_columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
+subscription_columns = ['Nome', 'Preço', 'Quantidade', 'Data Trade']
+columns_gain_loss = ['Data Trade', 'Nome', 'Quantidade', 'Operação', 'Preço Médio', 'Preço Venda', 'Lucros ou Prejuizos']
 
 special_chars_to_replace = '\xa0'
 start_asset_name = r'FRACIONADO|VISTA'
@@ -52,8 +56,11 @@ block_definition = {
 }
 
 row_definition = {
-    FileType.NOTAS: pp.Regex(regex_date)('data_trade') + pp.Suppress(pp.Literal('BOVESPA|LISTADO')) + pp.Word(pp.alphas)('tipo') + pp.Suppress(pp.Word(start_asset_name)) + pp.SkipTo(pp.Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + pp.Suppress(pp.SkipTo(pp.Word(pp.printables) + pp.White() + pp.Word(pp.nums), fail_on = '\n')) + pp.Word(pp.printables).set_parse_action(filter_obs)('Obs') + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('preco').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('total').set_parse_action(parse_number),
-    FileType.RENDIMENTOS: pp.Word(pp.alphanums)('nome') + pp.Regex(provento_types) + pp.Suppress(pp.SkipTo(pp.Word(pp.nums), include = False, fail_on='\n')) + pp.Word(pp.nums)('quantidade') + pp.Word(pp.nums + ',.')('valor_bruto').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('valor_ir').set_parse_action(parse_number) + pp.Word(pp.nums + ',.')('valor_liquido').set_parse_action(parse_number) + pp.Regex(regex_date)('data_trade')
+    FileType.NOTAS: 
+        Regex(regex_date)('data_trade') + Suppress(Literal('BOVESPA|LISTADO')) + Word(alphas)('tipo') + Suppress(Word(start_asset_name)) + SkipTo(Regex(end_asset_name), fail_on = '\n', include=False).set_parse_action(parse_asset_name)('nome') + Suppress(SkipTo(Word(printables) + White() + Word(nums), fail_on = '\n')) + Word(printables).set_parse_action(filter_obs)('Obs') + Word(nums)('quantidade') + Word(nums + ',.')('preco').set_parse_action(parse_number) + Word(nums + ',.')('total').set_parse_action(parse_number),
+    FileType.RENDIMENTOS: 
+
+        Word(alphanums)('nome') + Regex(provento_types) + Suppress(SkipTo(Word(nums), include = False, fail_on='\n')) + Word(nums)('quantidade') + Word(nums + ',.')('valor_bruto').set_parse_action(parse_number) + Word(nums + ',.')('valor_ir').set_parse_action(parse_number) + Word(nums + ',.')('valor_liquido').set_parse_action(parse_number) + Regex(regex_date)('data_trade')
 }
 
 b3_url_search = "https://sistemaswebb3-listados.b3.com.br/listedCompaniesProxy/CompanyCall/GetInitialCompanies/"
