@@ -28,6 +28,13 @@ def parse_asset_name(token):
     except:
         return token[0]
 
+def cnpj_format(cnpj: str) -> str:
+    cnpj = ''.join(filter(str.isdigit, cnpj))
+    
+    cnpj = cnpj.zfill(14)
+    
+    return f"{cnpj[:2]}.{cnpj[2:5]}.{cnpj[5:8]}/{cnpj[8:12]}-{cnpj[12:]}"
+
 class FileType(Enum):
     NOTAS = 1
     RENDIMENTOS = 2

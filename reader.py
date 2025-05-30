@@ -1,4 +1,4 @@
-from utils import regex_date, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search, provento_types, special_chars_to_replace, block_definition, row_definition, trade_columns, subscription_columns, columns_gain_loss, FileType
+from utils import regex_date, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search, provento_types, special_chars_to_replace, block_definition, row_definition, trade_columns, subscription_columns, columns_gain_loss, cnpj_format, FileType
 from datetime import datetime
 from PyPDF2 import PdfReader
 from copy import copy
@@ -122,14 +122,14 @@ class ParseCorretagem():
             res = requests.get(url, timeout=5)
             if res.status_code == 200 and res.json()['results']:
                 b3_info = res.json()['results'][0]
-                return f"{amount} Ações {b3_info.get('companyName', '').strip()} ({b3_info.get('cnpj', '')}) - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
+                return f"{amount} Ações {b3_info.get('companyName', '').strip()} ({cnpj_format(b3_info.get('cnpj', ''))}) - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
 
             url = b3_url_funds_search + b3_query_funds_search(asset)
             res = requests.get(url, timeout=5)
             
             if res.status_code == 200 and res.json():
                 b3_info = res.json()
-                return f"{amount} Ações {b3_info['detailFund'].get('companyName', '').strip()} ({b3_info['detailFund'].get('cnpj', '')}) - ADM {b3_info['shareHolder'].get('shareHolderName', '').strip()} - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
+                return f"{amount} Ações {b3_info['detailFund'].get('companyName', '').strip()} ({cnpj_format(b3_info['detailFund'].get('cnpj', ''))}) - ADM {b3_info['shareHolder'].get('shareHolderName', '').strip()} - Corretora XP INVESTIMENTOS (02.332.886/0001-04)  {mean_price}"
             return ''
         except:
             print(f"Asset {asset} not found in B3")
