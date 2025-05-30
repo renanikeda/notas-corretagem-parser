@@ -4,3 +4,5 @@ A classe ParseCorretagem recebe um caminho para parsear cada nota de cada ano (�
 
 Se há ativos que foram subscritos (FIIs e FI Infra) é preciso colocar no root um arquivo subscricao.csv no formato: Asset; Price; Amount; Date, exemplo: HGRU11; 126.17; 12; 01/08/2024.
 
+O projeto tem como escopo somente renda variável, listados como Ações, ETFs, FIIs e FI Infra, qualquer sugestão sinta-se a vontade.
+
