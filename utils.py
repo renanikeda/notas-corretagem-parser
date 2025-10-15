@@ -41,7 +41,7 @@ class FileType(Enum):
 
 trade_columns = ['Data Trade', 'Tipo', 'Nome', 'Obs', 'Quantidade', 'Preço', 'Total']
 subscription_columns = ['Nome', 'Preço', 'Quantidade', 'Data Trade']
-columns_gain_loss = ['Data Trade', 'Nome', 'Quantidade', 'Operação', 'Preço Médio', 'Preço Venda', 'Lucros ou Prejuizos']
+columns_gain_loss = ['Data Trade', 'Tipo Ação', 'Nome', 'Quantidade', 'Operação', 'Preço Médio', 'Preço Venda', 'Lucros ou Prejuizos']
 
 special_chars_to_replace = '\xa0'
 start_asset_name = r'FRACIONADO|VISTA'
@@ -117,7 +117,12 @@ de_para_ticker_original = {
     'FII VERSCRI': 'VSLH11',
     'SPARTA CDII': 'CDII11',
     'BITCOIN HASH': 'BITH11',
+    'ISA ENERGIA': 'ISAE4'
 }
+
+ticker_fii = {'BRCO11', 'DEVA11', 'HGRU11', 'KNRI11', 'MALL11', 'PMLL11', 'MXRF11', 'XPML11', 'BTLG11', 'VSLH11', 'CDII11', 'JURO11'}
+ticker_etf = {'IVVB11', 'BITH11', 'HASH11', 'BOVA11', 'SMAL11', 'DIVO11', 'ECOO11'}
+
 def expand_dict(data: dict) -> dict:
     result = data.copy()
     for key in data:

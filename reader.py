@@ -1,4 +1,4 @@
-from utils import regex_date, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search, provento_types, special_chars_to_replace, block_definition, row_definition, trade_columns, subscription_columns, columns_gain_loss, cnpj_format, FileType
+from utils import regex_date, de_para_ticker, b3_url_search, b3_query_search, b3_url_funds_search, b3_query_funds_search, provento_types, special_chars_to_replace, block_definition, row_definition, trade_columns, subscription_columns, columns_gain_loss, cnpj_format, FileType, ticker_etf, ticker_fii
 from datetime import datetime
 from PyPDF2 import PdfReader
 from copy import copy
@@ -169,7 +169,8 @@ class ParseCorretagem():
                     current_mean_price = sum_price / count if count > 0 else 0
                     selling_price = rowSubDf['Preço']
                     gain_loss = (selling_price - current_mean_price) * abs(rowSubDf['Quantidade'])
-                    gainLossDf = gainLossDf._append({'Data Trade': rowSubDf['Data Trade'], 'Nome': rowSubDf['Nome'], 'Operação': rowSubDf['Obs'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, ignore_index = True)
+                    tipo_acao = 'ETF' if rowSubDf['Nome'] in ticker_etf else ('FII' if rowSubDf['Nome'] in ticker_fii else 'Ação')
+                    gainLossDf = gainLossDf._append({'Data Trade': rowSubDf['Data Trade'], 'Tipo Ação': tipo_acao, 'Nome': rowSubDf['Nome'], 'Operação': rowSubDf['Obs'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, ignore_index = True)
                     gainLossDf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
         return gainLossDf
     
