@@ -114,7 +114,9 @@ de_para_ticker_original = {
     'FII XP MALLS': "XPML11",
     'SPARTA INFRA': 'JURO11',
     'FII BTLG': 'BTLG11',
-    'FII VERSCRI': 'VSLH11'
+    'FII VERSCRI': 'VSLH11',
+    'SPARTA CDII': 'CDII11',
+    'BITCOIN HASH': 'BITH11',
 }
 def expand_dict(data: dict) -> dict:
     result = data.copy()
