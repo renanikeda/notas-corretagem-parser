@@ -18,7 +18,7 @@ warnings.simplefilter(action='ignore', category=DeprecationWarning)
 class ParseCorretagem():
     def __init__(self, path = "12_2022.pdf", filter_years_list = []):
         self.path = path
-        self.filter_years_list = filter_years_list
+        self.filter_years_list = list(map(lambda y: str(y), filter_years_list))
         self.reset_cache()
     
     def reset_cache(self):
@@ -31,7 +31,7 @@ class ParseCorretagem():
         file_type_dir = "Notas de Corretagem" if file_type == FileType.NOTAS else "Proventos"
 
         if (self.path.split('.')[-1] == 'pdf'):
-            files_path._append(self.path)
+            files_path.append(self.path)
         else:
             for broker in filter(lambda dir: '.' not in dir, os.listdir(self.path)):
                 for file_year in os.listdir(f'{self.path}/{broker}'):
@@ -112,7 +112,8 @@ class ParseCorretagem():
     def get_trades_with_subscription(self, full_path = ''):
         self.get_trades()
         subscriptions_df = self.transform_subsciption_to_trade(full_path)
-        self.pd_parsed_pdf = self.pd_parsed_pdf._append(subscriptions_df, ignore_index = True)
+        # self.pd_parsed_pdf = self.pd_parsed_pdf.append(subscriptions_df, ignore_index = True)
+        self.pd_parsed_pdf = pd.concat([self.pd_parsed_pdf, subscriptions_df], ignore_index=True)
         self.pd_parsed_pdf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
         return self.pd_parsed_pdf
        
@@ -170,7 +171,9 @@ class ParseCorretagem():
                     selling_price = rowSubDf['Preço']
                     gain_loss = (selling_price - current_mean_price) * abs(rowSubDf['Quantidade'])
                     tipo_acao = 'ETF' if rowSubDf['Nome'] in ticker_etf else ('FII' if rowSubDf['Nome'] in ticker_fii else 'Ação')
-                    gainLossDf = gainLossDf._append({'Data Trade': rowSubDf['Data Trade'], 'Tipo Ação': tipo_acao, 'Nome': rowSubDf['Nome'], 'Operação': rowSubDf['Obs'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, ignore_index = True)
+                    # gainLossDf = gainLossDf.append({'Data Trade': rowSubDf['Data Trade'], 'Tipo Ação': tipo_acao, 'Nome': rowSubDf['Nome'], 'Operação': rowSubDf['Obs'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, ignore_index = True)
+                    new_GainLossDf = pd.DataFrame({'Data Trade': rowSubDf['Data Trade'], 'Tipo Ação': tipo_acao, 'Nome': rowSubDf['Nome'], 'Operação': rowSubDf['Obs'], 'Quantidade': rowSubDf['Quantidade'], 'Preço Médio': current_mean_price, 'Preço Venda': selling_price, 'Lucros ou Prejuizos': gain_loss}, index=[0])
+                    gainLossDf = pd.concat([gainLossDf, new_GainLossDf], ignore_index=True)
                     gainLossDf.sort_values('Data Trade', inplace=True, key=lambda col: pd.to_datetime(col, format="%d/%m/%Y", dayfirst=True))
         return gainLossDf
     
@@ -178,7 +181,9 @@ class ParseCorretagem():
         final_mean_df = pd.DataFrame([], columns = [*self.mean_df.columns, "IR Info"])
         for _, row in self.mean_df.iterrows():
             b3_info = self.setup_b3_info(row['Nome'], row['Quantidade'], row['Preço Médio'])
-            final_mean_df = final_mean_df._append({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'DIVIDENDO': row['DIVIDENDO'], 'JCP': row['JCP'], 'RENDIMENTO': row['RENDIMENTO'], 'IR Info': copy(b3_info)}, ignore_index = True)
+            # final_mean_df = final_mean_df.append({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'DIVIDENDO': row['DIVIDENDO'], 'JCP': row['JCP'], 'RENDIMENTO': row['RENDIMENTO'], 'IR Info': copy(b3_info)}, ignore_index = True)
+            new_final_mean_df = pd.DataFrame({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'DIVIDENDO': row['DIVIDENDO'], 'JCP': row['JCP'], 'RENDIMENTO': row['RENDIMENTO'], 'IR Info': copy(b3_info)}, index=[0])
+            final_mean_df = pd.concat([final_mean_df, new_final_mean_df], ignore_index=True)
             time.sleep(random.randint(200, 1000)*0.001)
 
         return final_mean_df
@@ -195,7 +200,9 @@ class ParseCorretagem():
             asset_rendimentos = filtered_rendimentos_pd[filtered_rendimentos_pd['Nome'] == asset]
             rendimentos = dict(zip(asset_rendimentos['Tipo'], asset_rendimentos['Valor Liquido']))
 
-            new_mean_df = new_mean_df._append({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'DIVIDENDO': rendimentos.get('DIVIDENDO', ''),  'JCP': rendimentos.get('JCP', ''),  'RENDIMENTO': rendimentos.get('RENDIMENTO', '')}, ignore_index = True)
+            # new_mean_df = new_mean_df.append({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'DIVIDENDO': rendimentos.get('DIVIDENDO', ''),  'JCP': rendimentos.get('JCP', ''),  'RENDIMENTO': rendimentos.get('RENDIMENTO', '')}, ignore_index = True)
+            _new_mean_df = pd.DataFrame({ 'Nome': row['Nome'], 'Quantidade': row['Quantidade'], 'Preço Médio': row['Preço Médio'], 'Posição Final': row['Posição Final'], 'DIVIDENDO': rendimentos.get('DIVIDENDO', ''),  'JCP': rendimentos.get('JCP', ''),  'RENDIMENTO': rendimentos.get('RENDIMENTO', '')}, index=[0])
+            new_mean_df = pd.concat([new_mean_df, _new_mean_df], ignore_index=True)
             
         self.mean_df = new_mean_df
         return new_mean_df
@@ -203,10 +210,10 @@ class ParseCorretagem():
     def generate_summary_file(self):
         pdParsedPdf = self.get_trades_with_subscription()
         pdMeanPdf = self.mean_price()
-
+        # print(pdParsedPdf)
         pdTradesPdf = self.trade_gain_and_losses()
         self.reset_cache()
-        self.filter_years_list= ['2024']
+        # self.filter_years_list = [] if self.filter_years_list == [] else self.filter_years_list
         pdRendimentosPdf = self.get_rendimentos()
 
         last_year = int(datetime.now().year) - 1
