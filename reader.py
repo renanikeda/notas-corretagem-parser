@@ -221,7 +221,7 @@ class ParseCorretagem():
 
 
         pdMeanPdf = self.add_b3_info_to_mean_price()
-        year = max(self.filter_years_list) or str(datetime.now().year)
+        year = max(self.filter_years_list) if self.filter_years_list else str(datetime.now().year)
         file_to_save = f"Notas_Parseadas_{year}.xlsx"
         file_already_exists = file_to_save in os.listdir()
 
