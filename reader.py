@@ -221,8 +221,8 @@ class ParseCorretagem():
 
 
         pdMeanPdf = self.add_b3_info_to_mean_price()
-
-        file_to_save = f"Notas_Parseadas_{datetime.now().year}.xlsx"
+        year = max(self.filter_years_list) or str(datetime.now().year)
+        file_to_save = f"Notas_Parseadas_{year}.xlsx"
         file_already_exists = file_to_save in os.listdir()
 
         mode = 'a' if file_already_exists else 'w'
@@ -243,7 +243,8 @@ class ParseCorretagem():
         path = self.path + '/subscricoes.csv' if not full_path else full_path
         
         if not 'subscricoes.csv' in os.listdir(self.path): return pd.DataFrame(columns=trade_columns)
-        df = pd.read_csv(path, sep=',', header=None)
+        df = pd.read_csv(path, sep=',', header=None, usecols=[0, 1, 2, 3])
+        df.dropna(inplace=True)
         df.columns = subscription_columns
         df['Preço'] = df['Preço'].str.replace(',', '.').astype(float)
         df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce')
